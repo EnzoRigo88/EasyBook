@@ -1,0 +1,14 @@
+# Caddyfile — reverse proxy con HTTPS automático (Let's Encrypt)
+# Reemplazar "easybook.ar" por el dominio real antes de deployar.
+
+api.easybook.ar {
+    reverse_proxy control-plane:3000
+}
+
+app.easybook.ar {
+    reverse_proxy dashboard:80
+}
+
+# n8n NO se expone públicamente. Si necesitás acceso de administración
+# puntual, usá un túnel SSH en vez de exponerlo en el Caddyfile:
+#   ssh -L 5678:localhost:5678 deploy@tu-servidor

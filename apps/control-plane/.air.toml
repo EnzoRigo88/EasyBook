@@ -1,0 +1,47 @@
+# .air.toml — Configuración de hot-reload para desarrollo con Air
+# https://github.com/air-verse/air
+# Uso: make dev (o directamente: air -c .air.toml)
+
+root = "."
+tmp_dir = "tmp"
+
+[build]
+  # Comando para compilar
+  cmd = "go build -o ./tmp/server ./cmd/server"
+  # Binario a ejecutar después de compilar
+  bin = "./tmp/server"
+  # Args del binario (útil para flags de dev)
+  args_bin = []
+  # Archivos que disparan un rebuild
+  include_ext = ["go", "tpl", "tmpl", "html"]
+  # Directorios a ignorar
+  exclude_dir = ["tmp", "vendor", "testdata", "internal/db/generated"]
+  # Archivos específicos a ignorar
+  exclude_file = []
+  # Ignorar archivos que matcheen este regex
+  exclude_regex = ["_test.go"]
+  # Ignorar cambios sin modificación real (evita rebuilds innecesarios)
+  exclude_unchanged = true
+  # Seguir symlinks
+  follow_symlink = false
+  # Delay entre detección del cambio y rebuild (ms)
+  delay = 200
+  # Matar el proceso anterior antes de re-compilar
+  stop_on_error = true
+  # Comando a correr antes del build (ej: generar mocks)
+  pre_cmd = []
+  # Comando a correr después del build exitoso
+  post_cmd = []
+
+[log]
+  time = true
+  main_only = false
+
+[color]
+  main = "magenta"
+  watcher = "cyan"
+  build = "yellow"
+  runner = "green"
+
+[misc]
+  clean_on_exit = true

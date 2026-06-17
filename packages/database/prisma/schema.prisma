@@ -1,0 +1,161 @@
+// packages/database/prisma/schema.prisma
+//
+// Este schema es la FUENTE DE VERDAD de la estructura de la base de datos.
+// Prisma se usa SOLO para generar y versionar migraciones SQL — el
+// control-plane en Go no usa el cliente de Prisma en runtime, usa sqlc
+// para generar código type-safe a partir de SQL plano contra este mismo esquema.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ── Clubs ─────────────────────────────────────────────────────────────────
+
+model Club {
+  id            String   @id @default(uuid())
+  name          String
+  waPhoneNumber String   @unique @map("wa_phone_number")
+  email         String
+  isActive      Boolean  @default(true) @map("is_active")
+  isSandbox     Boolean  @default(true) @map("is_sandbox")
+  shardId       String?  @map("shard_id") // a qué shard de n8n está asignado
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  courts    Court[]
+  bookings  Booking[]
+  waitlist  Waitlist[]
+  schedules Schedule[]
+  pricing   Pricing[]
+
+  @@map("clubs")
+}
+
+// ── Courts ────────────────────────────────────────────────────────────────
+
+model Court {
+  id       String  @id @default(uuid())
+  clubId   String  @map("club_id")
+  name     String
+  type     String  @default("padel") // padel | tenis | futbol5, etc.
+  isActive Boolean @default(true) @map("is_active")
+
+  club      Club       @relation(fields: [clubId], references: [id])
+  bookings  Booking[]
+  waitlist  Waitlist[]
+  schedules Schedule[]
+  pricing   Pricing[]
+
+  @@map("courts")
+}
+
+// ── Schedules (horarios de operación) ────────────────────────────────────
+
+model Schedule {
+  id            String @id @default(uuid())
+  clubId        String @map("club_id")
+  courtId       String @map("court_id")
+  dayOfWeek     Int    @map("day_of_week") // 0 = domingo ... 6 = sábado
+  openTime      String @map("open_time")   // "08:00"
+  closeTime     String @map("close_time")  // "23:00"
+  slotDuration  Int    @default(90) @map("slot_duration") // minutos
+
+  club  Club  @relation(fields: [clubId], references: [id])
+  court Court @relation(fields: [courtId], references: [id])
+
+  @@map("schedules")
+}
+
+// ── Pricing ───────────────────────────────────────────────────────────────
+
+model Pricing {
+  id            String  @id @default(uuid())
+  clubId        String  @map("club_id")
+  courtId       String  @map("court_id")
+  pricePerHour  Decimal @map("price_per_hour")
+
+  club  Club  @relation(fields: [clubId], references: [id])
+  court Court @relation(fields: [courtId], references: [id])
+
+  @@map("pricing")
+}
+
+// ── Bookings ──────────────────────────────────────────────────────────────
+
+enum BookingStatus {
+  confirmed
+  cancelled
+  completed
+  no_show
+}
+
+model Booking {
+  id        String        @id @default(uuid())
+  clubId    String        @map("club_id")
+  courtId   String        @map("court_id")
+  userPhone String        @map("user_phone")
+  userName  String?       @map("user_name")
+  startsAt  DateTime      @map("starts_at")
+  endsAt    DateTime      @map("ends_at")
+  status    BookingStatus @default(confirmed)
+  isSandbox Boolean       @default(false) @map("is_sandbox")
+  createdAt DateTime      @default(now()) @map("created_at")
+  updatedAt DateTime      @updatedAt @map("updated_at")
+
+  club  Club  @relation(fields: [clubId], references: [id])
+  court Court @relation(fields: [courtId], references: [id])
+
+  @@index([clubId, courtId, startsAt])
+  @@index([userPhone, clubId])
+  @@map("bookings")
+}
+
+// ── Waitlist ──────────────────────────────────────────────────────────────
+
+model Waitlist {
+  id         String    @id @default(uuid())
+  clubId     String    @map("club_id")
+  courtId    String    @map("court_id")
+  userPhone  String    @map("user_phone")
+  userName   String?   @map("user_name")
+  slotTime   DateTime  @map("slot_time")
+  notifiedAt DateTime? @map("notified_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  club  Club  @relation(fields: [clubId], references: [id])
+  court Court @relation(fields: [courtId], references: [id])
+
+  @@map("waitlist")
+}
+
+// ── Conversation history (memoria del agente) ──────────────────────────────
+
+model ConversationMessage {
+  id        String   @id @default(uuid())
+  clubId    String   @map("club_id")
+  userPhone String   @map("user_phone")
+  role      String   // "user" | "assistant"
+  content   String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([clubId, userPhone, createdAt])
+  @@map("conversation_messages")
+}
+
+// ── Users (admins del dashboard) ────────────────────────────────────────
+
+model User {
+  id           String   @id @default(uuid())
+  clubId       String   @map("club_id")
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  role         String   @default("club_admin") // club_admin | super_admin
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@map("users")
+}

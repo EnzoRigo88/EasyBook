@@ -1,0 +1,90 @@
+version: "3.9"
+
+# docker-compose.prod.yml — corre en el VPS de Hetzner
+# Todos los servicios en contenedores, detrás de Caddy (HTTPS automático)
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    container_name: easybook-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - control-plane
+
+  control-plane:
+    image: ghcr.io/enzorigo88/easybook-control-plane:latest
+    container_name: easybook-control-plane
+    restart: unless-stopped
+    env_file:
+      - ../../.env
+    environment:
+      ENV: production
+    expose:
+      - "3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  dashboard:
+    image: ghcr.io/enzorigo88/easybook-dashboard:latest
+    container_name: easybook-dashboard
+    restart: unless-stopped
+    expose:
+      - "80"
+
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: easybook-n8n
+    restart: unless-stopped
+    env_file:
+      - ../../.env
+    environment:
+      N8N_BASIC_AUTH_ACTIVE: "true"
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_HOST: postgres
+      DB_POSTGRESDB_PORT: 5432
+      DB_POSTGRESDB_DATABASE: easybook
+      DB_POSTGRESDB_SCHEMA: n8n
+    expose:
+      - "5678"
+    volumes:
+      - n8n_data:/home/node/.n8n
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: easybook-postgres
+    restart: unless-stopped
+    env_file:
+      - ../../.env
+    environment:
+      POSTGRES_USER: easybook
+      POSTGRES_DB: easybook
+    expose:
+      - "5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U easybook"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:
+  n8n_data:
+  caddy_data:
+  caddy_config:
+
+# Nota: n8n y postgres usan `expose` (no `ports`) — solo accesibles
+# desde otros contenedores en la misma red Docker, nunca desde internet.
+# Solo Caddy publica puertos al host (80/443).
