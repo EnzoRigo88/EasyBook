@@ -19,7 +19,10 @@ type Config struct {
 	JWTSecret        string
 	JWTRefreshSecret string
 
+	// LLMProvider selects the LLM backend: "openai" | "ollama" | "mock"
+	LLMProvider  string
 	OpenAIAPIKey string
+	OllamaBaseURL string
 
 	// WhatsApp — Meta Cloud API (producción)
 	MetaWAPhoneNumberID      string
@@ -43,13 +46,17 @@ func Load() (*Config, error) {
 		_ = godotenv.Load() // ignorar error: .env es opcional en CI
 	}
 
+	provider := getEnv("LLM_PROVIDER", "openai")
+
 	cfg := &Config{
 		Port:                     getEnv("PORT", "3000"),
 		Env:                      getEnv("ENV", "development"),
 		DatabaseURL:              mustGetEnv("DATABASE_URL"),
 		JWTSecret:                mustGetEnv("JWT_SECRET"),
 		JWTRefreshSecret:         getEnv("JWT_REFRESH_SECRET", ""),
-		OpenAIAPIKey:             mustGetEnv("OPENAI_API_KEY"),
+		LLMProvider:              provider,
+		OllamaBaseURL:            getEnv("OLLAMA_BASE_URL", "http://ollama:11434/v1"),
+		OpenAIAPIKey:             conditionalMustGetEnv("OPENAI_API_KEY", provider == "openai"),
 		MetaWAPhoneNumberID:      getEnv("META_WA_PHONE_NUMBER_ID", ""),
 		MetaWAAccessToken:        getEnv("META_WA_ACCESS_TOKEN", ""),
 		MetaWAWebhookVerifyToken: getEnv("META_WA_WEBHOOK_VERIFY_TOKEN", "dev-verify-token"),
@@ -75,12 +82,20 @@ func getEnv(key, fallback string) string {
 	return fallback
 }
 
-// mustGetEnv hace panic en startup si una var requerida no está.
-// Mejor fallar rápido al iniciar que tener un error críptico en runtime.
+// mustGetEnv panics at startup if a required env var is missing.
 func mustGetEnv(key string) string {
 	v := os.Getenv(key)
 	if v == "" {
 		panic(fmt.Sprintf("variable de entorno requerida %q no está configurada", key))
 	}
 	return v
+}
+
+// conditionalMustGetEnv behaves like mustGetEnv when required is true,
+// otherwise it returns the value or empty string without panicking.
+func conditionalMustGetEnv(key string, required bool) string {
+	if required {
+		return mustGetEnv(key)
+	}
+	return os.Getenv(key)
 }

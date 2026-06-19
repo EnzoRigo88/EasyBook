@@ -14,12 +14,11 @@ import (
 // para este volumen de conversaciones, con soporte maduro de function calling.
 // Ver docs/ADR/002-modelo-ia.md para el detalle de la decisión.
 type AgentService struct {
-	client         *openai.Client
+	client         ChatCompleter
 	bookingService *BookingService
 }
 
-func NewAgentService(apiKey string, bookingSvc *BookingService) *AgentService {
-	client := openai.NewClient(apiKey)
+func NewAgentService(client ChatCompleter, bookingSvc *BookingService) *AgentService {
 	return &AgentService{
 		client:         client,
 		bookingService: bookingSvc,

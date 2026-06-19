@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/EnzoRigo88/EasyBook/control-plane/internal/api/handlers"
 	"github.com/EnzoRigo88/EasyBook/control-plane/internal/api/middleware"
@@ -11,15 +12,36 @@ import (
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/httprate"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"time"
+	"github.com/rs/zerolog/log"
+	openai "github.com/sashabaranov/go-openai"
 )
+
+// newLLMClient builds the correct ChatCompleter based on LLM_PROVIDER.
+// "mock"   → deterministic scripted responses, no network (default for local dev)
+// "ollama" → OpenAI-compatible client pointed at a local Ollama container
+// "openai" → real OpenAI API (requires OPENAI_API_KEY)
+func newLLMClient(cfg *config.Config) service.ChatCompleter {
+	switch cfg.LLMProvider {
+	case "mock":
+		log.Info().Msg("LLM: using mock (no network calls)")
+		return service.NewMockChatCompleter()
+	case "ollama":
+		log.Info().Str("base_url", cfg.OllamaBaseURL).Msg("LLM: using Ollama")
+		clientCfg := openai.DefaultConfig("ollama")
+		clientCfg.BaseURL = cfg.OllamaBaseURL
+		return openai.NewClientWithConfig(clientCfg)
+	default:
+		log.Info().Msg("LLM: using OpenAI GPT-4o-mini")
+		return openai.NewClient(cfg.OpenAIAPIKey)
+	}
+}
 
 // NewRouter configura todas las rutas de la aplicación.
 // En Go, preferimos funciones de construcción explícitas sobre frameworks mágicos.
 func NewRouter(cfg *config.Config, pool *pgxpool.Pool) http.Handler {
 	// ── Services ──────────────────────────────────────────────────────────────
 	bookingSvc := service.NewBookingService(pool)
-	agentSvc   := service.NewAgentService(cfg.OpenAIAPIKey, bookingSvc)
+	agentSvc   := service.NewAgentService(newLLMClient(cfg), bookingSvc)
 
 	// ── Handlers ──────────────────────────────────────────────────────────────
 	webhookHandler := handlers.NewWebhookHandler(agentSvc, bookingSvc)

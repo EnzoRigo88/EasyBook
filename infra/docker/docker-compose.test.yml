@@ -1,0 +1,86 @@
+services:
+
+  # ── Database ────────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: easybook
+      POSTGRES_PASSWORD: easybook_dev
+      POSTGRES_DB: easybook
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U easybook"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ── n8n ─────────────────────────────────────────────────────────────────────
+  n8n:
+    image: n8nio/n8n:latest
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=admin
+      - N8N_BASIC_AUTH_PASSWORD=admin123
+      - N8N_ENCRYPTION_KEY=dev-encryption-key-changeme
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=easybook
+      - DB_POSTGRESDB_USER=easybook
+      - DB_POSTGRESDB_PASSWORD=easybook_dev
+      - DB_POSTGRESDB_SCHEMA=n8n
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ── Control Plane (Go) ───────────────────────────────────────────────────────
+  control-plane:
+    build:
+      context: ../../apps/control-plane
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3000:3000"
+    env_file:
+      - ../../.env.test
+    environment:
+      - DATABASE_URL=postgresql://easybook:easybook_dev@postgres:5432/easybook
+      - N8N_WEBHOOK_URL=http://n8n:5678
+    volumes:
+      - ../../apps/control-plane:/app
+      - go_mod_cache:/root/go/pkg/mod
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ── Dashboard (React + Vite) ─────────────────────────────────────────────────
+  dashboard:
+    build:
+      context: ../../apps/dashboard
+      dockerfile: Dockerfile.dev
+    ports:
+      - "5173:5173"
+    volumes:
+      - ../../apps/dashboard:/app
+      - /app/node_modules
+    environment:
+      - VITE_API_URL=http://localhost:3000
+
+  # ── Ollama (optional — real local LLM, ~2 GB model download on first run) ───
+  ollama:
+    image: ollama/ollama:latest
+    profiles: ["ollama"]
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    # After starting: docker exec easybook-ollama-1 ollama pull llama3.2
+
+volumes:
+  postgres_data:
+  go_mod_cache:
+  ollama_data:
