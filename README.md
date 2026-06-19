@@ -1,75 +1,75 @@
-# EasyBook 🎾
+# EasyBook
 
-Plataforma SaaS multi-tenant que automatiza la gestión de turnos de canchas de pádel vía WhatsApp, usando un agente de IA (Claude) orquestado con n8n.
+Multi-tenant SaaS platform that automates booking management for padel courts via WhatsApp, using an AI agent orchestrated with n8n.
 
 ## Stack
 
-| Componente | Tecnología |
+| Component | Technology |
 |---|---|
 | Control Plane API | Go 1.22 + Chi + pgx/v5 |
 | Dashboard | React + Vite + TypeScript |
-| Orquestación de mensajería | n8n (self-hosted) |
-| Base de datos | PostgreSQL (schema-per-tenant + RLS) |
-| Agente IA | GPT-4o-mini (OpenAI) |
-| Infra | Hetzner VPS + Docker Compose |
+| Messaging Orchestration | n8n (self-hosted) |
+| Database | PostgreSQL (schema-per-tenant + RLS) |
+| AI Agent | GPT-4o-mini (OpenAI) |
+| Infrastructure | Hetzner VPS + Docker Compose |
 
-## Estructura del repo
+## Repository Structure
 
 ```
 easybook/
 ├── apps/
-│   ├── control-plane/   # Go — API principal, provisioning, agente IA
-│   ├── dashboard/        # React — UI para el club
-│   └── n8n-workflows/    # JSON exports de workflows de n8n
+│   ├── control-plane/   # Go — main API, provisioning, AI agent
+│   ├── dashboard/        # React — club management UI
+│   └── n8n-workflows/    # n8n workflow JSON exports
 ├── packages/
-│   └── database/         # Prisma schema + migrations (fuente de verdad del esquema SQL)
+│   └── database/         # Prisma schema + migrations (SQL schema source of truth)
 ├── infra/
 │   ├── docker/            # docker-compose dev/prod
-│   ├── hetzner/            # cloud-init, setup del VPS
-│   └── scripts/             # provisioning, utilidades
+│   ├── hetzner/           # cloud-init, VPS setup
+│   └── scripts/           # provisioning utilities
 ├── docs/
-│   ├── ADR/                  # decisiones de arquitectura
-│   └── runbooks/              # guías operativas
-└── .github/workflows/          # CI/CD
+│   ├── ADR/               # architecture decision records
+│   └── runbooks/          # operational guides
+└── .github/workflows/     # CI/CD
 ```
 
-> **Nota de arquitectura:** el schema de la base de datos vive en `packages/database` usando Prisma solo como herramienta de migraciones versionadas (no como ORM en runtime). El `control-plane` en Go usa `sqlc` para generar código type-safe a partir de SQL plano, leyendo el mismo esquema.
+> **Architecture note:** the database schema lives in `packages/database` using Prisma solely as a versioned migration tool (not as a runtime ORM). The Go `control-plane` uses `sqlc` to generate type-safe code from plain SQL against the same schema.
 
-## Quickstart local
+## Local Quickstart
 
 ```bash
-# 1. Variables de entorno
+# 1. Environment variables
 cp .env.example .env
-# completar OPENAI_API_KEY como mínimo
+# fill in OPENAI_API_KEY at minimum
 
-# 2. Levantar Postgres + n8n
+# 2. Start Postgres + n8n
 docker compose -f infra/docker/docker-compose.dev.yml up -d
 
-# 3. Correr migraciones
+# 3. Run migrations
 cd packages/database && npx prisma migrate dev && cd ../..
 
-# 4. Arrancar el control-plane (Go)
+# 4. Start the control-plane (Go)
 cd apps/control-plane
 go mod tidy
-make dev          # hot-reload con Air
+make dev          # hot-reload with Air
 
-# 5. (En otra terminal) arrancar el dashboard
+# 5. (In another terminal) start the dashboard
 cd apps/dashboard
 npm install
 npm run dev
 ```
 
-Servicios disponibles:
+Available services:
 - Control Plane API → `http://localhost:3000`
 - Dashboard → `http://localhost:5173`
-- n8n → `http://localhost:5678` (admin / admin123 en dev)
+- n8n → `http://localhost:5678` (admin / admin123 in dev)
 
-## Documentación
+## Documentation
 
-- [Contexto completo del proyecto](docs/PROYECTO_CONTEXTO.md)
+- [Full project context](docs/PROJECT_CONTEXT.md)
 - [Architecture Decision Records](docs/ADR/)
-- [Runbooks operativos](docs/runbooks/)
+- [Operational runbooks](docs/runbooks/)
 
-## Licencia
+## License
 
-Privado — todos los derechos reservados.
+Private — all rights reserved.
