@@ -49,12 +49,17 @@ easybook/
 ### Option 1 — Docker (recommended, nothing to install locally)
 
 ```bash
-# 1. Copy the env template
+# 0. Clone the repo
+git clone <repo-url> easybook && cd easybook
+
+# 1. Copy the env template (already committed as .env.test — skip if it exists)
 cp .env.example .env.test
 
-# 2. Start the full stack
+# 2. Start the full stack (builds app images on first run — takes ~1 min)
 docker compose -f infra/docker/docker-compose.test.yml up
 ```
+
+> **Note:** `control-plane` and `dashboard` images are built locally from `Dockerfile.dev` — no pre-built images to pull. Subsequent runs use the Docker layer cache and start in seconds.
 
 That's it. The stack starts with `LLM_PROVIDER=mock` — no OpenAI key or internet access required.
 
